@@ -22,3 +22,5 @@ inherits = "release"
 debug = true
 split-debuginfo = "packed"
 
+[package.metadata.release]
+publish = false
