@@ -24,8 +24,13 @@ fn main() {
             let dir = e.path().with_extension("");
             std::fs::create_dir_all(&dir).unwrap();
             for tex in tp.textures.iter() {
-                let path = dir.join(format!("{:08x}.png", tex.id));
+                let meta = tex.header.meta();
+                let path = dir.join(format!("{:08x}.png", meta.id));
                 tex.data.value.as_ref().unwrap().0.save(path).unwrap();
+                std::fs::write(
+                    dir.join(format!("{:08x}.json", meta.id)),
+                    serde_json::to_string_pretty(&meta).unwrap()
+                ).unwrap()
             }
 
             println!("{:#?}", tp);

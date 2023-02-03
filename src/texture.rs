@@ -3,6 +3,7 @@ use std::io::{Read, Seek};
 use anyhow::Result;
 use binrw::{BinRead, BinReaderExt, BinResult, BinrwNamedArgs, BinWrite, FilePtr32, ReadOptions};
 use image::{DynamicImage, Rgb, Rgba, RgbaImage, RgbImage};
+use serde::{Deserialize, Serialize};
 
 #[derive(BinRead, Debug)]
 pub struct TexturePackage {
@@ -11,8 +12,14 @@ pub struct TexturePackage {
     pub textures: FilePtr32<Vec<Texture>>,
 }
 
-#[derive(BinRead, Copy, Clone, Debug)]
-#[br(repr = u32)]
+#[derive(BinWrite, Debug)]
+pub struct TexturePackageRaw {
+    pub texture_count: u32,
+    pub textures_ptr: u32,
+}
+
+#[derive(BinRead, BinWrite, Copy, Clone, Debug, Serialize, Deserialize)]
+#[brw(repr = u32)]
 pub enum TextureFormat {
     R5G5B5A1 = 0,
     R4G4B4A4 = 1,
@@ -20,8 +27,8 @@ pub enum TextureFormat {
     R8G8B8A8 = 3,
 }
 
-#[derive(BinRead, Debug)]
-pub struct Texture {
+#[derive(BinRead, BinWrite, Debug)]
+pub struct TextureHeader {
     pub id: u32,
     pub width: u32,
     pub height: u32,
@@ -30,7 +37,35 @@ pub struct Texture {
     pub unk_14: i32,
     pub unk_18: i32,
     pub texture_format: TextureFormat,
-    #[br(args { width, height, texture_format } )]
+}
+
+impl TextureHeader {
+    pub fn meta(&self) -> TextureMeta {
+        TextureMeta {
+            id: self.id,
+            unk_c: self.unk_c,
+            unk_10: self.unk_10,
+            unk_14: self.unk_14,
+            unk_18: self.unk_18,
+            texture_format: self.texture_format,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TextureMeta {
+    pub id: u32,
+    pub unk_c: i32,
+    pub unk_10: i32,
+    pub unk_14: i32,
+    pub unk_18: i32,
+    pub texture_format: TextureFormat,
+}
+
+#[derive(BinRead, Debug)]
+pub struct Texture {
+    pub header: TextureHeader,
+    #[br(args { width: header.width, height: header.height, texture_format: header.texture_format } )]
     pub data: FilePtr32<TextureData>,
 }
 
@@ -53,7 +88,7 @@ impl Debug for TextureData {
 impl BinRead for TextureData {
     type Args = TextureDataArgs;
 
-    fn read_options<R: Read + Seek>(reader: &mut R, options: &ReadOptions, args: Self::Args) -> BinResult<Self> {
+    fn read_options<R: Read + Seek>(reader: &mut R, _options: &ReadOptions, args: Self::Args) -> BinResult<Self> {
         let format = args.texture_format;
 
         let bpp = match format {
