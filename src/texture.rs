@@ -2,14 +2,14 @@ use std::fmt::Debug;
 use std::io::{Read, Seek};
 use anyhow::Result;
 use binrw::{BinRead, BinReaderExt, BinResult, BinrwNamedArgs, BinWrite, FilePtr32, ReadOptions};
-use image::{DynamicImage, Rgb, Rgba, RgbaImage, RgbImage};
+use image::{DynamicImage, RgbaImage, RgbImage};
 use serde::{Deserialize, Serialize};
 
 #[derive(BinRead, Debug)]
 pub struct TexturePackage {
     pub texture_count: u32,
-    #[br(count = texture_count)]
-    pub textures: FilePtr32<Vec<Texture>>,
+    #[br(parse_with = FilePtr32::parse, count = texture_count)]
+    pub textures: Vec<Texture>,
 }
 
 #[derive(BinWrite, Debug)]
@@ -65,8 +65,8 @@ pub struct TextureMeta {
 #[derive(BinRead, Debug)]
 pub struct Texture {
     pub header: TextureHeader,
-    #[br(args { width: header.width, height: header.height, texture_format: header.texture_format } )]
-    pub data: FilePtr32<TextureData>,
+    #[br(parse_with = FilePtr32::parse, args { width: header.width, height: header.height, texture_format: header.texture_format } )]
+    pub data: TextureData,
 }
 
 #[derive(BinrwNamedArgs, Clone, Debug)]

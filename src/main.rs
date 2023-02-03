@@ -26,7 +26,7 @@ fn main() {
             for tex in tp.textures.iter() {
                 let meta = tex.header.meta();
                 let path = dir.join(format!("{:08x}.png", meta.id));
-                tex.data.value.as_ref().unwrap().0.save(path).unwrap();
+                tex.data.0.save(path).unwrap();
                 std::fs::write(
                     dir.join(format!("{:08x}.json", meta.id)),
                     serde_json::to_string_pretty(&meta).unwrap()
