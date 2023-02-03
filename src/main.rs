@@ -1,38 +1,66 @@
 use std::path::PathBuf;
 use clap::Parser;
+use crate::texture::TexturePackage;
 
 mod texture;
 
 #[derive(clap::Parser, Debug)]
 struct Cli {
-    path: PathBuf,
+    #[clap(subcommand)]
+    command: CliCommand,
+}
+
+#[derive(clap::Subcommand, Debug)]
+enum CliCommand {
+    /// Extract textures from a tpg file
+    Extract {
+        /// Path to the tpg file
+        path: PathBuf,
+        /// Path to the output directory
+        result: PathBuf,
+    },
+    /// Create a tpg file from a directory of textures
+    Create {
+        /// Path to the directory containing the textures
+        path: PathBuf,
+        /// Path to the output tpg file
+        result: PathBuf,
+        #[clap(long)]
+        /// Change the used texture format
+        force_format: Option<texture::TextureFormat>,
+    },
 }
 
 fn main() {
     let cli = Cli::parse();
 
-    walkdir::WalkDir::new(cli.path)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
-        .filter(|e| e.path().extension().unwrap() == "tpg")
-        .for_each(|e| {
-            println!("{}", e.path().display());
-            let data = std::fs::read(e.path()).unwrap();
+    match cli.command {
+        CliCommand::Extract { path, result } => {
+            let data = std::fs::read(path).unwrap();
             let tp = texture::read_texture_package(&data).unwrap();
 
-            let dir = e.path().with_extension("");
-            std::fs::create_dir_all(&dir).unwrap();
+            std::fs::create_dir_all(&result).unwrap();
+
             for tex in tp.textures.iter() {
-                let meta = tex.header.meta();
-                let path = dir.join(format!("{:08x}.png", meta.id));
-                tex.data.0.save(path).unwrap();
+                let meta = &tex.meta;
+                let path = result.join(format!("{:08x}.png", meta.id));
+                tex.data.save(path).unwrap();
                 std::fs::write(
-                    dir.join(format!("{:08x}.json", meta.id)),
+                    result.join(format!("{:08x}.json", meta.id)),
                     serde_json::to_string_pretty(&meta).unwrap()
                 ).unwrap()
             }
+        }
+        CliCommand::Create { path, result, force_format } => {
+            let mut tp = TexturePackage::from_directory(&path).unwrap();
+            if let Some(format) = force_format {
+                for tex in tp.textures.iter_mut() {
+                    tex.meta.texture_format = format;
+                }
+            }
 
-            println!("{:#?}", tp);
-        });
+            let data = texture::write_texture_package(&tp).unwrap();
+            std::fs::write(result, data).unwrap();
+        }
+    }
 }
